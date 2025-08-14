@@ -1,0 +1,58 @@
+version: "3.9"
+services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: library
+      MYSQL_USER: app
+      MYSQL_PASSWORD: app
+    ports: ["3307:3306"]
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uapp", "-papp"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # Recreate schema + seed mock data on EVERY up
+  db-init:
+    image: mysql:8.0
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    environment:
+      MYSQL_PWD: root
+    entrypoint: ["/bin/sh","-lc"]
+    command: >
+      'until mysqladmin ping -hmysql -uroot >/dev/null 2>&1; do sleep 1; done;
+       mysql -hmysql -uroot < /docker-entrypoint-initdb.d/init.sql;
+       echo "DB reset + seed complete."; tail -f /dev/null'
+
+  mongo:
+    image: mongo:7
+    ports: ["27017:27017"]
+    volumes:
+      - mongo_data:/data/db
+
+  api:
+    build: .
+    depends_on:
+      mysql:
+        condition: service_healthy
+      db-init:
+        condition: service_started
+      mongo:
+        condition: service_started
+    env_file: [.env]
+    ports: ["8080:8080"]
+    volumes:
+      - .:/usr/src/app
+    command: ["npm","run","dev"]
+
+volumes:
+  mysql_data:
+  mongo_data:
