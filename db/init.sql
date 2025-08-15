@@ -34,17 +34,3 @@ INSERT INTO books (title, author, publisher, genre, available_copies, image_url)
   ('Designing Data-Intensive Applications', 'Martin Kleppmann', 'O''Reilly', 'Data', 2, 'https://covers.openlibrary.org/b/isbn/9781449373320-L.jpg');
 
 
--- Stored procedure to search books by title or author or publisher or genre
-DELIMITER $$
-
-CREATE PROCEDURE search_books(IN searchTerm VARCHAR(255))
-BEGIN
-    SELECT *
-    FROM books
-    WHERE title     LIKE CONCAT('%', searchTerm, '%')
-       OR author    LIKE CONCAT('%', searchTerm, '%')
-       OR publisher LIKE CONCAT('%', searchTerm, '%')
-       OR genre     LIKE CONCAT('%', searchTerm, '%');
-END$$
-
-DELIMITER ;
