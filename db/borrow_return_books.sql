@@ -48,6 +48,8 @@ BEGIN
     -- insert borrow checkout
     INSERT INTO checkout(user_id, book_id, borrow_date) 
     values (user_id, book_id, CURRENT_TIMESTAMP);
+
+    COMMIT;
 END $$
 
 DELIMITER ;
@@ -81,7 +83,7 @@ BEGIN
     WHERE id = p_checkout_id;
 
     -- throws if already returned
-    IF return_date IS NOT NULL THEN
+    IF v_return_date IS NOT NULL THEN
         SIGNAL SQLSTATE '45000'
             SET MESSAGE_TEXT = 'Already returned checkout';
     END IF;
@@ -104,35 +106,43 @@ DELIMITER ;
 
 -- TRIGGER
 /*
-Trigger: update_book_metadata
-Desc: Update book metadata after a checkout (borrow/return)
+Trigger: ins_checkout
+Desc: Update book metadata after a borrow
 */
 DELIMITER $$
 
-CREATE TRIGGER update_book_metadata
+CREATE TRIGGER ins_checkout
 AFTER INSERT ON checkout
 FOR EACH ROW
 BEGIN
-    # Decide whether it's a borrow or return operation
-    DECLARE is_borrow BOOLEAN;
-    IF NEW.borrow_date IS NOT NULL THEN 
-        SET is_borrow = TRUE;
-    ELSEIF NEW.return_data IS NOT NULL THEN 
-        SET is_borrow = FALSE;
-    ELSE THEN 
-        SIGNAL SQLSTATE '45000' 
-            SET MESSAGE_TEXT = "Invalid checkout, neither borrowing or returning"
-    END IF;
-
-    # Update book metadata
-    IF is_borrow = TRUE THEN 
+    -- guard
+    IF NEW.borrow_date IS NOT NULL AND NEW.return_date IS NULL THEN
+        -- decrease available_copies after borrow
         UPDATE books 
         set available_copies = available_copies - 1
         where books.id = NEW.book_id;
-    ELSE THEN 
+    END IF;
+end $$
+
+DELIMITER ;
+
+/*
+Trigger: upd_checkout
+Desc: Update book metadata after a borrow
+*/
+DELIMITER $$
+
+CREATE TRIGGER upd_checkout
+AFTER UPDATE ON checkout
+FOR EACH ROW
+BEGIN
+    -- guard
+    IF NEW.return_date IS NOT NULL THEN AND OLD.return_date IS NULL
+        -- increase available_copies after return
         UPDATE books 
         set available_copies = available_copies + 1
         where books.id = NEW.book_id;
+    END IF;
 end $$
 
 DELIMITER ;

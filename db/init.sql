@@ -22,6 +22,19 @@ CREATE TABLE books (
   image_url VARCHAR(1024)
 );
 
+-- Checkouts
+CREATE TABLE checkouts (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  book_id INT NOT NULL,
+  borrow_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  return_date TIMESTAMP NULL,
+  is_late BOOLEAN NOT NULL DEFAULT NULL, -- null for active borrows
+  CONSTRAINT fk_checkouts_user FOREIGN KEY (user_id) REFERENCES users(id),
+  CONSTRAINT fk_checkouts_book FOREIGN KEY (book_id) REFERENCES books(id)
+);
+
+
 -- Mock data
 INSERT INTO users (name, email, role) VALUES
   ('Admin One', 'admin1@example.com', 'admin'),
