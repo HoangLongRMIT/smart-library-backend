@@ -11,7 +11,7 @@
       "driver": "MySQL",
       "name": "RMIT Library",
       "database": "library",
-      "username": "app"
+      "username": "root"
     }
   ]
 }
