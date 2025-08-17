@@ -29,11 +29,10 @@ CREATE TABLE checkouts (
   book_id INT NOT NULL,
   borrow_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   return_date TIMESTAMP NULL,
-  is_late BOOLEAN NOT NULL DEFAULT NULL, -- null for active borrows
-  CONSTRAINT fk_checkouts_user FOREIGN KEY (user_id) REFERENCES users(id),
-  CONSTRAINT fk_checkouts_book FOREIGN KEY (book_id) REFERENCES books(id)
+  is_late BOOLEAN DEFAULT NULL, -- null for active borrows
+  CONSTRAINT fk_checkouts_user FOREIGN KEY (user_id) REFERENCES users(user_id),
+  CONSTRAINT fk_checkouts_book FOREIGN KEY (book_id) REFERENCES books(book_id)
 );
-
 
 -- Mock data
 INSERT INTO users (name, email, role) VALUES

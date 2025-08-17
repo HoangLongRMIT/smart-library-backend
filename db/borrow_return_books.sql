@@ -37,7 +37,7 @@ BEGIN
     INTO copies_left
     FROM books b 
     WHERE b.id = book_id    
-    FOR UPDATE  -- lock the row to prevent dirty read
+    FOR UPDATE;  -- lock the row to prevent dirty read
 
     -- throws if no copies left
     IF copies_left <= 0 THEN
@@ -46,13 +46,15 @@ BEGIN
     END IF;
 
     -- insert borrow checkout
-    INSERT INTO checkout(user_id, book_id, borrow_date) 
-    values (user_id, book_id, CURRENT_TIMESTAMP);
+    INSERT INTO checkouts(user_id, book_id, borrow_date) 
+    VALUES (user_id, book_id, CURRENT_TIMESTAMP);
 
     COMMIT;
 END $$
 
 DELIMITER ;
+
+
 
 /*
 Procedure: return_book
@@ -79,7 +81,7 @@ BEGIN
     -- fetch borrow date and return date
     SELECT borrow_date, return_date
     INTO v_borrow_date, v_return_date
-    FROM checkout
+    FROM checkouts
     WHERE id = p_checkout_id;
 
     -- throws if already returned
@@ -92,7 +94,7 @@ BEGIN
     SET v_is_late = TIMESTAMPDIFF(DAY, v_borrow_date, CURRENT_TIMESTAMP) > 7;
 
     -- update checkout
-    UPDATE checkout
+    UPDATE checkouts
     SET return_date = CURRENT_TIMESTAMP,
         is_late = v_is_late
     WHERE id = p_checkout_id;
@@ -104,7 +106,7 @@ DELIMITER ;
 
 
 
--- TRIGGER
+-- TRIGGERS
 /*
 Trigger: ins_checkout
 Desc: Update book metadata after a borrow
@@ -112,37 +114,37 @@ Desc: Update book metadata after a borrow
 DELIMITER $$
 
 CREATE TRIGGER ins_checkout
-AFTER INSERT ON checkout
+AFTER INSERT ON checkouts
 FOR EACH ROW
 BEGIN
     -- guard
     IF NEW.borrow_date IS NOT NULL AND NEW.return_date IS NULL THEN
         -- decrease available_copies after borrow
         UPDATE books 
-        set available_copies = available_copies - 1
-        where books.id = NEW.book_id;
+        SET available_copies = available_copies - 1
+        WHERE books.id = NEW.book_id;
     END IF;
-end $$
+END $$
 
 DELIMITER ;
 
 /*
 Trigger: upd_checkout
-Desc: Update book metadata after a borrow
+Desc: Update book metadata after a return
 */
 DELIMITER $$
 
 CREATE TRIGGER upd_checkout
-AFTER UPDATE ON checkout
+AFTER UPDATE ON checkouts
 FOR EACH ROW
 BEGIN
     -- guard
-    IF NEW.return_date IS NOT NULL THEN AND OLD.return_date IS NULL
+    IF NEW.return_date IS NOT NULL AND OLD.return_date IS NULL THEN
         -- increase available_copies after return
         UPDATE books 
-        set available_copies = available_copies + 1
-        where books.id = NEW.book_id;
+        SET available_copies = available_copies + 1
+        WHERE books.id = NEW.book_id;
     END IF;
-end $$
+END $$
 
 DELIMITER ;
