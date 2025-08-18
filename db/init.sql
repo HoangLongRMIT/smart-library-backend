@@ -22,6 +22,17 @@ CREATE TABLE books (
   image_url VARCHAR(1024)
 );
 
+CREATE TABLE reviews (
+    review_id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    book_id INT NOT NULL,
+    rating INT CHECK (rating BETWEEN 1 AND 5),
+    comment VARCHAR(500),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(user_id),
+    FOREIGN KEY (book_id) REFERENCES books(book_id)
+); ENGINE = InnoDB;
+
 -- Mock data
 INSERT INTO users (name, email, role) VALUES
   ('Admin One', 'admin1@example.com', 'admin'),
