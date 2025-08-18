@@ -54,9 +54,9 @@ CREATE TABLE checkout (
     checkout_id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
     book_id INT NOT NULL,
-    borrowDate DATE NOT NULL,
-    returnDate DATE,
-    isLate BOOLEAN DEFAULT FALSE,
+    borrow_date DATE NOT NULL,
+    return_date DATE,
+    is_late BOOLEAN DEFAULT FALSE,
     FOREIGN KEY (user_id) REFERENCES user(user_id),
     FOREIGN KEY (book_id) REFERENCES book(book_id)
 );
@@ -533,7 +533,7 @@ INSERT INTO review (user_id, book_id, rating, comment) VALUES
 
 
 -- checkout table
-INSERT INTO checkout (user_id, book_id, borrowDate, returnDate, isLate) VALUES
+INSERT INTO checkout (user_id, book_id, borrow_date, return_date, is_late) VALUES
   (17, 11, '2025-06-08', NULL, FALSE),
   (3, 82, '2025-07-17', NULL, FALSE),
   (14, 25, '2025-06-17', NULL, FALSE),
