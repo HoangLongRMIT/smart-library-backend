@@ -4,7 +4,7 @@ CREATE DATABASE library;
 USE library;
 
 -- Single users table with role
-CREATE TABLE users (
+CREATE TABLE user (
   user_id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
   email VARCHAR(255) UNIQUE NOT NULL,
@@ -12,7 +12,7 @@ CREATE TABLE users (
 );
 
 -- Books for the frontend list (includes image_url for cover)
-CREATE TABLE books (
+CREATE TABLE book (
   book_id INT AUTO_INCREMENT PRIMARY KEY,
   title VARCHAR(255) NOT NULL,
   author VARCHAR(255),
@@ -22,17 +22,18 @@ CREATE TABLE books (
   image_url VARCHAR(1024)
 );
 
--- Checkouts
-CREATE TABLE checkouts (
+-- Checkout
+CREATE TABLE checkout (
   id INT AUTO_INCREMENT PRIMARY KEY,
   user_id INT NOT NULL,
   book_id INT NOT NULL,
   borrow_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   return_date TIMESTAMP NULL,
   is_late BOOLEAN DEFAULT NULL, -- null for active borrows
-  CONSTRAINT fk_checkouts_user FOREIGN KEY (user_id) REFERENCES users(user_id),
-  CONSTRAINT fk_checkouts_book FOREIGN KEY (book_id) REFERENCES books(book_id)
+  CONSTRAINT fk_checkout_user FOREIGN KEY (user_id) REFERENCES user(user_id),
+  CONSTRAINT fk_checkout_book FOREIGN KEY (book_id) REFERENCES book(book_id)
 );
+
 
 -- Borrow / Return books
 
@@ -60,8 +61,8 @@ BEGIN
     -- verify that book is still available, lock row
     SELECT available_copies 
     INTO copies_left
-    FROM books b 
-    WHERE b.book_id = book_id   -- fixed column name
+    FROM book b 
+    WHERE b.book_id = book_id
     FOR UPDATE;
 
     -- throws if no copies left
@@ -71,11 +72,11 @@ BEGIN
     END IF;
 
     -- insert borrow checkout
-    INSERT INTO checkouts(user_id, book_id, borrow_date) 
+    INSERT INTO checkout(user_id, book_id, borrow_date) 
     VALUES (user_id, book_id, CURRENT_TIMESTAMP);
 
     COMMIT;
-END $$
+END $$ 
 DELIMITER ;
 
 /*
@@ -96,6 +97,7 @@ BEGIN
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
         ROLLBACK;
+        RESIGNAL;
     END;
 
     START TRANSACTION;
@@ -103,7 +105,7 @@ BEGIN
     -- fetch borrow date and return date
     SELECT borrow_date, return_date
     INTO v_borrow_date, v_return_date
-    FROM checkouts
+    FROM checkout
     WHERE id = p_checkout_id;
 
     -- throws if already returned
@@ -116,61 +118,62 @@ BEGIN
     SET v_is_late = TIMESTAMPDIFF(DAY, v_borrow_date, CURRENT_TIMESTAMP) > 7;
 
     -- update checkout
-    UPDATE checkouts
+    UPDATE checkout
     SET return_date = CURRENT_TIMESTAMP,
         is_late = v_is_late
     WHERE id = p_checkout_id;
 
     COMMIT;
-END $$
+END $$ 
 DELIMITER ;
 
 /*
-Trigger: ins_checkout
+Trigger: after_checkout_insert
 Desc: Update book metadata after a borrow
 */
 
-DROP TRIGGER IF EXISTS ins_checkout;
+DROP TRIGGER IF EXISTS after_checkout_insert;
 DELIMITER $$
-CREATE TRIGGER ins_checkout
-AFTER INSERT ON checkouts
+CREATE TRIGGER after_checkout_insert
+AFTER INSERT ON checkout
 FOR EACH ROW
 BEGIN
     IF NEW.borrow_date IS NOT NULL AND NEW.return_date IS NULL THEN
-        UPDATE books 
+        UPDATE book 
         SET available_copies = available_copies - 1
-        WHERE books.book_id = NEW.book_id;
+        WHERE book.book_id = NEW.book_id;
     END IF;
-END $$
+END $$ 
 DELIMITER ;
 
 /*
-Trigger: upd_checkout
+Trigger: after_checkout_update
 Desc: Update book metadata after a return
 */
 
-DROP TRIGGER IF EXISTS upd_checkout;
+DROP TRIGGER IF EXISTS after_checkout_update;
 DELIMITER $$
-CREATE TRIGGER upd_checkout
-AFTER UPDATE ON checkouts
+CREATE TRIGGER after_checkout_update
+AFTER UPDATE ON checkout
 FOR EACH ROW
 BEGIN
     IF NEW.return_date IS NOT NULL AND OLD.return_date IS NULL THEN
-        UPDATE books 
+        UPDATE book 
         SET available_copies = available_copies + 1
-        WHERE books.book_id = NEW.book_id;
+        WHERE book.book_id = NEW.book_id;
     END IF;
-END $$
+END $$ 
 DELIMITER ;
 
 
+
 -- Mock data
-INSERT INTO users (name, email, role) VALUES
+INSERT INTO user (name, email, role) VALUES
   ('Admin One', 'admin1@example.com', 'admin'),
   ('Alice Reader', 'alice@example.com', 'user'),
   ('Bob Reader', 'bob@example.com', 'user');
 
-INSERT INTO books (title, author, publisher, genre, available_copies, image_url) VALUES
+INSERT INTO book (title, author, publisher, genre, available_copies, image_url) VALUES
   ('Clean Code', 'Robert C. Martin', 'Prentice Hall', 'Programming', 3, 'https://covers.openlibrary.org/b/isbn/9780132350884-L.jpg'),
   ('The Pragmatic Programmer', 'Andrew Hunt, David Thomas', 'Addison-Wesley', 'Programming', 5, 'https://covers.openlibrary.org/b/isbn/9780201616224-L.jpg'),
   ('Designing Data-Intensive Applications', 'Martin Kleppmann', 'O''Reilly', 'Data', 2, 'https://covers.openlibrary.org/b/isbn/9781449373320-L.jpg');
