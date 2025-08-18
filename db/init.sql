@@ -30,7 +30,7 @@ CREATE TABLE author (
 );
 
 -- Book author (junction table for many-to-many relationship)
-CREATE TABLE book_author (
+CREATE TABLE bookAuthor (
     book_id INT,
     author_id INT,
     PRIMARY KEY (book_id, author_id),
@@ -50,7 +50,7 @@ CREATE TABLE review (
 );
 
 -- Staff logs table
-CREATE TABLE staff_log (
+CREATE TABLE staffLog (
     log_id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
     book_id INT NOT NULL,
@@ -456,8 +456,8 @@ INSERT INTO author (name) VALUES
   ('Phil Knight'),
   ('Charles Duhigg');
 
--- book_author table
-INSERT INTO book_author (book_id, author_id) VALUES
+-- bookAuthor table
+INSERT INTO bookAuthor (book_id, author_id) VALUES
   (1, 1),
   (2, 2), (2, 3),
   (3, 4),
@@ -766,8 +766,8 @@ INSERT INTO checkout (user_id, book_id, borrowDate, returnDate, isLate) VALUES
   (15, 77, '2025-07-02', '2025-07-13', FALSE),
   (4, 6, '2025-07-13', '2025-07-26', FALSE);
 
--- staff_log table
-INSERT INTO staff_log (user_id, book_id, action, timestamp) VALUES
+-- staffLog table
+INSERT INTO staffLog (user_id, book_id, action, timestamp) VALUES
   (7, 67, 'Updated author info', '2025-06-04 15:51:00'),
   (12, 47, 'Added new book', '2025-07-09 20:40:00'),
   (3, 26, 'Deleted book copy', '2025-06-29 20:59:00'),
