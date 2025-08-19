@@ -7,7 +7,7 @@ CREATE PROCEDURE add_review(
     IN p_comment TEXT
 )
 BEGIN
-    INSERT INTO reviews (user_id, book_id, rating, comment)
+    INSERT INTO review (user_id, book_id, rating, comment)
     VALUES (p_user_id, p_book_id, p_rating, p_comment);
 END$$
 
