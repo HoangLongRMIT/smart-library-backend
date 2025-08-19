@@ -4,7 +4,7 @@ DELIMITER $$
 CREATE PROCEDURE search_books(IN searchTerm VARCHAR(255))
 BEGIN
     SELECT *
-    FROM books
+    FROM book
     WHERE title     LIKE CONCAT('%', searchTerm, '%')
        OR author    LIKE CONCAT('%', searchTerm, '%')
        OR publisher LIKE CONCAT('%', searchTerm, '%')
