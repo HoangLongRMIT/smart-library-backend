@@ -7,7 +7,7 @@ services:
       MYSQL_DATABASE: library
       MYSQL_USER: app
       MYSQL_PASSWORD: app
-    ports: ["3310:3306"]
+    ports: ["3307:3306"]
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:

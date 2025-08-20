@@ -664,7 +664,7 @@ INSERT INTO review (user_id, book_id, rating, comment) VALUES
 
 
 -- checkout table
-INSERT INTO checkout (user_id, book_id, borrowDate, returnDate, isLate) VALUES
+INSERT INTO checkout (user_id, book_id, borrow_date, return_date, is_late) VALUES
   (17, 11, '2025-06-08', NULL, FALSE),
   (3, 82, '2025-07-17', NULL, FALSE),
   (14, 25, '2025-06-17', NULL, FALSE),
