@@ -737,3 +737,4 @@ INSERT INTO staffLog (user_id, book_id, action, timestamp) VALUES
   (2, 16, 'Updated author info', '2025-07-08 04:35:00'),
   (10, 28, 'Deleted book copy', '2025-07-09 18:17:00'),
   (8, 45, 'Updated book info', '2025-06-23 05:24:00');
+
