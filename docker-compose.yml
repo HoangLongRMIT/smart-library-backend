@@ -7,7 +7,7 @@ services:
       MYSQL_DATABASE: library
       MYSQL_USER: app
       MYSQL_PASSWORD: app
-    ports: ["3307:3306"]
+    ports: ["3310:3306"]
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
@@ -26,7 +26,7 @@ services:
       - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     environment:
       MYSQL_PWD: root
-    entrypoint: ["/bin/sh","-lc"]
+    entrypoint: ["/bin/sh", "-lc"]
     command: >
       'until mysqladmin ping -hmysql -uroot >/dev/null 2>&1; do sleep 1; done;
        mysql -hmysql -uroot < /docker-entrypoint-initdb.d/init.sql;
@@ -51,7 +51,7 @@ services:
     ports: ["8080:8080"]
     volumes:
       - .:/usr/src/app
-    command: ["npm","run","dev"]
+    command: ["npm", "run", "dev"]
 
 volumes:
   mysql_data:
