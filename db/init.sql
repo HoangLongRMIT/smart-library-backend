@@ -20,7 +20,8 @@ CREATE TABLE book (
   genre VARCHAR(100),
   available_copies INT DEFAULT 0,
   average_rating DECIMAL(2,1) DEFAULT 0,
-  image_url VARCHAR(1024)
+  image_url VARCHAR(1024),
+  is_retired BOOLEAN DEFAULT FALSE
 );
 
 -- Author table
