@@ -4,12 +4,16 @@ DELIMITER $$
 
 CREATE PROCEDURE search_books(IN searchTerm VARCHAR(255))
 BEGIN
-    SELECT *
-    FROM book
-    WHERE title     LIKE CONCAT('%', searchTerm, '%')
-       OR author    LIKE CONCAT('%', searchTerm, '%')
-       OR publisher LIKE CONCAT('%', searchTerm, '%')
-       OR genre     LIKE CONCAT('%', searchTerm, '%');
+    SELECT b.*
+    FROM book b
+    JOIN bookAuthor ba on b.book_id = ba.book_id
+    JOIN author a on ba.author_id = a.author_id
+    WHERE MATCH(b.title, b.publisher, b.genre) 
+        AGAINST(searchTerm IN NATURAL LANGUAGE MODE)
+	OR b.title LIKE CONCAT('%', searchTerm, '%')
+    OR b.publisher LIKE CONCAT('%', searchTerm, '%')
+    OR b.genre LIKE CONCAT('%', searchTerm, '%')
+    OR a.name LIKE CONCAT('%', searchTerm, '%');
 END$$
 
 DELIMITER ;
