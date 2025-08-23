@@ -1,10 +1,9 @@
 SELECT 
   book_id, 
   title, 
-  author, 
   publisher, 
   genre, 
   available_copies, 
   image_url
-FROM books
+FROM book
 ORDER BY title;

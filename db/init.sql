@@ -9,7 +9,8 @@ CREATE TABLE user (
   name VARCHAR(255) NOT NULL,
   email VARCHAR(255) UNIQUE NOT NULL,
   role ENUM('admin','user') NOT NULL DEFAULT 'user',
-  password VARCHAR(255) NOT NULL
+  password VARCHAR(255) NOT NULL,
+  last_checkout_date TIMESTAMP DEFAULT NULL
 );
 
 -- Books for the frontend list (includes image_url for cover)
@@ -18,9 +19,13 @@ CREATE TABLE book (
   title VARCHAR(255) NOT NULL,
   publisher VARCHAR(255),
   genre VARCHAR(100),
-  available_copies INT DEFAULT 0,
+  available_copies INT DEFAULT 0 ,
   average_rating DECIMAL(2,1) DEFAULT 0,
-  image_url VARCHAR(1024)
+  image_url VARCHAR(1024),
+  is_retired BOOLEAN DEFAULT FALSE,
+
+  -- checks
+  CONSTRAINT chk_available_copies CHECK (available_copies >= 0)
 );
 
 -- Author table
@@ -67,26 +72,24 @@ CREATE TABLE checkout (
   book_id INT NOT NULL,
   borrow_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   return_date TIMESTAMP NULL,
-  is_late BOOLEAN DEFAULT NULL, -- null for active borrows
+  is_late BOOLEAN DEFAULT NULL,
   CONSTRAINT fk_checkout_user FOREIGN KEY (user_id) REFERENCES user(user_id),
   CONSTRAINT fk_checkout_book FOREIGN KEY (book_id) REFERENCES book(book_id)
 );
 
-
--- Borrow / Return books
+-- BORROW / RETURN BOOK
 
 /*
 Procedure: borrow_book
 Params: user_id INT, book_id INT
 Desc: Handles borrowing a book with transaction + row locking
 */
-
 DROP PROCEDURE IF EXISTS borrow_book;
 DELIMITER $$ 
 CREATE PROCEDURE borrow_book(IN user_id INT, IN book_id INT)
 BEGIN
-    DECLARE copies_left INT;
-
+    DECLARE v_copies_left INT;
+    DECLARE v_is_retired BOOLEAN;
     -- rollback on any sql exceptions
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
@@ -97,16 +100,22 @@ BEGIN
     START TRANSACTION;
 
     -- verify that book is still available, lock row
-    SELECT available_copies 
-    INTO copies_left
+    SELECT available_copies, is_retired
+    INTO v_copies_left, v_is_retired 
     FROM book b 
-    WHERE b.book_id = book_id
-    FOR UPDATE;
+    WHERE b.book_id = book_id 
+    FOR UPDATE; 
 
     -- throws if no copies left
-    IF copies_left <= 0 THEN
+    IF v_copies_left <= 0 THEN
         SIGNAL SQLSTATE '45000'
             SET MESSAGE_TEXT = 'No available copies left';
+    END IF;
+
+    -- throws if is retired
+    IF v_is_retired = TRUE THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'This book is not for borrowing';
     END IF;
 
     -- insert borrow checkout
@@ -114,7 +123,7 @@ BEGIN
     VALUES (user_id, book_id, CURRENT_TIMESTAMP);
 
     COMMIT;
-END $$ 
+END$$ 
 DELIMITER ;
 
 /*
@@ -122,88 +131,108 @@ Procedure: return_book
 Params: checkout_id INT
 Desc: Handles returning a book
 */
-
 DROP PROCEDURE IF EXISTS return_book;
 DELIMITER $$
 CREATE PROCEDURE return_book(IN p_checkout_id INT)
 BEGIN
-    DECLARE v_borrow_date TIMESTAMP;
-    DECLARE v_return_date TIMESTAMP;
-    DECLARE v_is_late BOOLEAN;
+  DECLARE v_borrow_date TIMESTAMP;
+  DECLARE v_return_date TIMESTAMP;
+  DECLARE v_is_late BOOLEAN;
 
-    -- rollback on any sql exceptions
-    DECLARE EXIT HANDLER FOR SQLEXCEPTION
-    BEGIN
-        ROLLBACK;
-        RESIGNAL;
-    END;
+  -- rollback on any sql exceptions
+  DECLARE EXIT HANDLER FOR SQLEXCEPTION
+  BEGIN
+      ROLLBACK;
+      RESIGNAL;
+  END;
 
-    START TRANSACTION;
+  START TRANSACTION;
 
-    -- fetch borrow date and return date
-    SELECT c.borrow_date, c.return_date
-    INTO v_borrow_date, v_return_date
-    FROM checkout c
-    WHERE c.checkout_id = p_checkout_id;
+  -- fetch borrow date and return date
+  SELECT c.borrow_date, c.return_date
+  INTO v_borrow_date, v_return_date
+  FROM checkout c
+  WHERE c.checkout_id = p_checkout_id;
 
-    -- throws if already returned
-    IF v_return_date IS NOT NULL THEN
-        SIGNAL SQLSTATE '45000'
-            SET MESSAGE_TEXT = 'Already returned checkout';
-    END IF;
+  -- throws if already returned
+  IF v_return_date IS NOT NULL THEN
+      SIGNAL SQLSTATE '45000'
+          SET MESSAGE_TEXT = 'Already returned checkout';
+  END IF;
 
-    -- calculate if returned late (>7 days)
-    SET v_is_late = TIMESTAMPDIFF(DAY, v_borrow_date, CURRENT_TIMESTAMP) > 7;
+  -- calculate if returned late (>7 days)
+  SET v_is_late = TIMESTAMPDIFF(DAY, v_borrow_date, CURRENT_TIMESTAMP) > 7;
 
-    -- update checkout
-    UPDATE checkout c
-    SET c.return_date = CURRENT_TIMESTAMP,
-        c.is_late = v_is_late
-    WHERE c.checkout_id = p_checkout_id;
+  -- update checkout
+  UPDATE checkout c
+  SET c.return_date = CURRENT_TIMESTAMP,
+      c.is_late = v_is_late
+  WHERE c.checkout_id = p_checkout_id;
 
-    COMMIT;
-END $$ 
+  COMMIT;
+END$$ 
 DELIMITER ;
 
 /*
 Trigger: after_checkout_insert
 Desc: Update book metadata after a borrow
 */
-
 DROP TRIGGER IF EXISTS after_checkout_insert;
 DELIMITER $$
 CREATE TRIGGER after_checkout_insert
 AFTER INSERT ON checkout
 FOR EACH ROW
 BEGIN
-    IF NEW.borrow_date IS NOT NULL AND NEW.return_date IS NULL THEN
-        UPDATE book 
-        SET available_copies = available_copies - 1
-        WHERE book.book_id = NEW.book_id;
+  IF NEW.borrow_date IS NOT NULL THEN
+    
+    -- Borrow only
+    IF NEW.return_date IS NULL THEN
+      -- Update book availability
+      UPDATE book 
+      SET available_copies = available_copies - 1
+      WHERE book.book_id = NEW.book_id;
+
+      -- Update user's last checkout date
+      UPDATE user u
+      SET u.last_checkout_date = NEW.borrow_date
+      WHERE u.user_id = NEW.user_id;
+    
+    -- Borrow & return at the same time
+    ELSE
+      UPDATE user u
+      SET u.last_checkout_date = NEW.return_date
+      WHERE u.user_id = NEW.user_id;
     END IF;
-END $$ 
+
+  END IF;
+END$$
 DELIMITER ;
 
 /*
 Trigger: after_checkout_update
 Desc: Update book metadata after a return
 */
-
 DROP TRIGGER IF EXISTS after_checkout_update;
 DELIMITER $$
 CREATE TRIGGER after_checkout_update
 AFTER UPDATE ON checkout
 FOR EACH ROW
 BEGIN
-    IF NEW.return_date IS NOT NULL AND OLD.return_date IS NULL THEN
-        UPDATE book 
-        SET available_copies = available_copies + 1
-        WHERE book.book_id = NEW.book_id;
-    END IF;
-END $$ 
+  IF NEW.return_date IS NOT NULL THEN
+    -- Update book availability
+    UPDATE book 
+    SET available_copies = available_copies + 1
+    WHERE book.book_id = NEW.book_id;
+
+    -- Update user's last checkout date
+    UPDATE user u 
+    SET u.last_checkout_date = NEW.return_date 
+    WHERE u.user_id = NEW.user_id;
+  END IF;
+END$$ 
 DELIMITER ;
 
--- Mock data
+-- MOCK DATA
 
 -- user table
 INSERT INTO user (name, email, role, password) VALUES

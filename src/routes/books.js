@@ -12,7 +12,6 @@
 
 // export default r;
 
-
 import { Router } from "express";
 import { readFileSync } from "fs";
 import { join } from "path";
@@ -29,6 +28,7 @@ const getAllBooksSQL = readFileSync(
 r.get("/", async (_req, res) => {
   try {
     const [rows] = await pool.query(getAllBooksSQL);
+    console.log(rows);
     res.json(rows);
   } catch (err) {
     console.error("Error fetching books:", err);
