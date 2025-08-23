@@ -9,7 +9,8 @@ CREATE TABLE user (
   name VARCHAR(255) NOT NULL,
   email VARCHAR(255) UNIQUE NOT NULL,
   role ENUM('admin','user') NOT NULL DEFAULT 'user',
-  password VARCHAR(255) NOT NULL
+  password VARCHAR(255) NOT NULL,
+  last_checkout_date TIMESTAMP DEFAULT NULL
 );
 
 -- Books for the frontend list (includes image_url for cover)
@@ -68,12 +69,14 @@ CREATE TABLE checkout (
   book_id INT NOT NULL,
   borrow_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   return_date TIMESTAMP NULL,
-  is_late BOOLEAN DEFAULT NULL, -- null for active borrows
+  is_late BOOLEAN DEFAULT NULL,
   CONSTRAINT fk_checkout_user FOREIGN KEY (user_id) REFERENCES user(user_id),
   CONSTRAINT fk_checkout_book FOREIGN KEY (book_id) REFERENCES book(book_id)
 );
 
-
+-- Source to staff reports & staff operations SQL
+SOURCE /docker-entrypoint-initdb.d/staff_reports.sql;
+SOURCE /docker-entrypoint-initdb.d/staff_operations.sql;
 -- Borrow / Return books
 
 /*
@@ -99,10 +102,10 @@ BEGIN
 
     -- verify that book is still available, lock row
     SELECT available_copies 
-    INTO copies_left
+    INTO copies_left 
     FROM book b 
-    WHERE b.book_id = book_id
-    FOR UPDATE;
+    WHERE b.book_id = book_id 
+    FOR UPDATE; 
 
     -- throws if no copies left
     IF copies_left <= 0 THEN
@@ -177,11 +180,18 @@ CREATE TRIGGER after_checkout_insert
 AFTER INSERT ON checkout
 FOR EACH ROW
 BEGIN
-    IF NEW.borrow_date IS NOT NULL AND NEW.return_date IS NULL THEN
-        UPDATE book 
-        SET available_copies = available_copies - 1
-        WHERE book.book_id = NEW.book_id;
-    END IF;
+  IF NEW.borrow_date IS NOT NULL AND NEW.return_date IS NULL THEN
+    START TRANSACTION;
+      -- Update book availability
+      UPDATE book 
+      SET available_copies = available_copies - 1
+      WHERE book.book_id = NEW.book_id;
+
+      -- Update user's last checkout date
+      UPDATE user 
+      SET last_checkout_date = NEW.borrow_date
+    COMMIT;
+  END IF;
 END $$ 
 DELIMITER ;
 
@@ -196,11 +206,19 @@ CREATE TRIGGER after_checkout_update
 AFTER UPDATE ON checkout
 FOR EACH ROW
 BEGIN
-    IF NEW.return_date IS NOT NULL AND OLD.return_date IS NULL THEN
-        UPDATE book 
-        SET available_copies = available_copies + 1
-        WHERE book.book_id = NEW.book_id;
-    END IF;
+  IF NEW.return_date IS NOT NULL AND OLD.return_date IS NULL THEN
+    START TRANSACTION;
+      -- Update book availability
+      UPDATE book 
+      SET available_copies = available_copies + 1
+      WHERE book.book_id = NEW.book_id;
+
+      -- Update user's last checkout date
+      UPDATE user 
+      SET last_checkout_date = NEW.return_date;
+
+    COMMIT;
+  END IF;
 END $$ 
 DELIMITER ;
 
