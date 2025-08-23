@@ -6,14 +6,13 @@ Params:
     p_genre     VARCHAR
     p_image_url     VARCHAR
 Returns:
-    p_book_id   INT
+    p_inserted_book_id   INT
 Desc: 
     Inserts a new book record into the `book` table.
     And return the inserted book id
 */
 DROP PROCEDURE IF EXISTS add_book;
 DELIMITER $$
-
 CREATE PROCEDURE add_book
 (
     IN p_title VARCHAR(255), 
@@ -28,7 +27,6 @@ BEGIN
 
     SET p_inserted_book_id = LAST_INSERT_ID();
 END$$
-
 DELIMITER ;
 
 /*

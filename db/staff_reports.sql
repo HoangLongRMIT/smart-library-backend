@@ -1,8 +1,8 @@
 /*
 Procedure: get_low_availability_books
 Params: 
-    p_availability_count INT
-    p_book_count INT
+    p_availability_count INT UNSIGNED
+    p_book_count INT UNSIGNED
 Desc:
     Return the top "n" lowest availability books
 */
@@ -25,7 +25,7 @@ DELIMITER ;
 /*
 Procedure: get_most_borrowed_books
 Params: 
-    p_book_count INT
+    p_book_count INT UNSIGNED
     p_start_date TIMESTAMP
     p_end_date TIMESTAMP
 Desc:
@@ -58,7 +58,7 @@ DELIMITER ;
 /*
 Procedure: get_top_active_readers
 Params: 
-    p_reader_count INT
+    p_reader_count INT UNSIGNED
 Desc:
     Return the top "n" active readers by number of checkouts
 */
