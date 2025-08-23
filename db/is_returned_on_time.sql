@@ -1,3 +1,5 @@
+DROP FUNCTION IF EXISTS is_returned_on_time;
+
 DELIMITER $$
 CREATE FUNCTION is_returned_on_time(p_checkout_id INT)
 RETURNS BOOLEAN

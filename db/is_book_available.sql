@@ -1,3 +1,5 @@
+DROP FUNCTION IF EXISTS is_book_available;
+
 DELIMITER $$
 CREATE FUNCTION is_book_available(p_book_id INT)
 RETURNS BOOLEAN
