@@ -1,7 +1,7 @@
-DROP FUNCTION IF EXISTS get_borrowed_books_count;
+DROP FUNCTION IF EXISTS get_count_borrowed_books;
 
 DELIMITER $$
-CREATE FUNCTION get_borrowed_books_count(p_start DATE, p_end DATE)
+CREATE FUNCTION get_count_borrowed_books(p_start DATE, p_end DATE)
 RETURNS INT
 DETERMINISTIC
 READS SQL DATA
