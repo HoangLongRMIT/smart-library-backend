@@ -19,10 +19,13 @@ CREATE TABLE book (
   title VARCHAR(255) NOT NULL,
   publisher VARCHAR(255),
   genre VARCHAR(100),
-  available_copies INT DEFAULT 0,
+  available_copies INT DEFAULT 0 ,
   average_rating DECIMAL(2,1) DEFAULT 0,
   image_url VARCHAR(1024),
-  is_retired BOOLEAN DEFAULT FALSE
+  is_retired BOOLEAN DEFAULT FALSE,
+
+  -- checks
+  CONSTRAINT chk_available_copies CHECK (available_copies >= 0)
 );
 
 -- Author table
@@ -54,25 +57,13 @@ CREATE TABLE review (
 -- Staff logs table
 CREATE TABLE staffLog (
     log_id INT AUTO_INCREMENT PRIMARY KEY,
-    staff_id INT NOT NULL,
-    action_type ENUM(
-        'CHECKOUT_CREATE',
-        'CHECKOUT_UPDATE',
-        'BOOK_INSERT',
-        'BOOK_UPDATE',
-        'BOOK_DELETE',
-        'USER_INSERT',
-        'USER_UPDATE',
-        'USER_DELETE',
-        'REPORT_GENERATE',
-        'OTHER'
-    ) NOT NULL,
-    action_details TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_staff_logs_staff FOREIGN KEY (staff_id) 
-        REFERENCES user(user_id)
+    user_id INT NOT NULL,
+    book_id INT NOT NULL,
+    action VARCHAR(255) NOT NULL,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES user(user_id),
+    FOREIGN KEY (book_id) REFERENCES book(book_id)
 );
-
 
 -- Checkout
 CREATE TABLE checkout (
@@ -97,8 +88,8 @@ DROP PROCEDURE IF EXISTS borrow_book;
 DELIMITER $$ 
 CREATE PROCEDURE borrow_book(IN user_id INT, IN book_id INT)
 BEGIN
-    DECLARE copies_left INT;
-
+    DECLARE v_copies_left INT;
+    DECLARE v_is_retired BOOLEAN;
     -- rollback on any sql exceptions
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
@@ -109,16 +100,22 @@ BEGIN
     START TRANSACTION;
 
     -- verify that book is still available, lock row
-    SELECT available_copies 
-    INTO copies_left 
+    SELECT available_copies, is_retired
+    INTO v_copies_left, v_is_retired 
     FROM book b 
     WHERE b.book_id = book_id 
     FOR UPDATE; 
 
     -- throws if no copies left
-    IF copies_left <= 0 THEN
+    IF v_copies_left <= 0 THEN
         SIGNAL SQLSTATE '45000'
             SET MESSAGE_TEXT = 'No available copies left';
+    END IF;
+
+    -- throws if is retired
+    IF v_is_retired = TRUE THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'This book is not for borrowing';
     END IF;
 
     -- insert borrow checkout
@@ -126,7 +123,7 @@ BEGIN
     VALUES (user_id, book_id, CURRENT_TIMESTAMP);
 
     COMMIT;
-END $$ 
+END$$ 
 DELIMITER ;
 
 /*
@@ -173,7 +170,7 @@ BEGIN
   WHERE c.checkout_id = p_checkout_id;
 
   COMMIT;
-END $$ 
+END$$ 
 DELIMITER ;
 
 /*
@@ -187,25 +184,29 @@ AFTER INSERT ON checkout
 FOR EACH ROW
 BEGIN
   IF NEW.borrow_date IS NOT NULL THEN
-    -- Guard against invalid inserts
-    IF NEW.return_date IS NOT NULL THEN
-      SIGNAL SQLSTATE '45000'
-        SET MESSAGE_TEXT = 'Invalid checkout insert: both borrow_date and return_date set';
+    
+    -- Borrow only
+    IF NEW.return_date IS NULL THEN
+      -- Update book availability
+      UPDATE book 
+      SET available_copies = available_copies - 1
+      WHERE book.book_id = NEW.book_id;
+
+      -- Update user's last checkout date
+      UPDATE user u
+      SET u.last_checkout_date = NEW.borrow_date
+      WHERE u.user_id = NEW.user_id;
+    
+    -- Borrow & return at the same time
+    ELSE
+      UPDATE user u
+      SET u.last_checkout_date = NEW.return_date
+      WHERE u.user_id = NEW.user_id;
     END IF;
 
-    -- Update book availability
-    UPDATE book 
-    SET available_copies = available_copies - 1
-    WHERE book.book_id = NEW.book_id;
-
-    -- Update user's last checkout date
-    UPDATE user u
-    SET u.last_checkout_date = NEW.borrow_date
-    WHERE u.user_id = NEW.user_id;
   END IF;
-END $$
+END$$
 DELIMITER ;
-
 
 /*
 Trigger: after_checkout_update
@@ -228,138 +229,7 @@ BEGIN
     SET u.last_checkout_date = NEW.return_date 
     WHERE u.user_id = NEW.user_id;
   END IF;
-END $$ 
-DELIMITER ;
-
--- STAFF OPERATIONS (add book, retire book, update inventory)
-
-/*
-Procedure: add_book
-Params: 
-    p_title        VARCHAR(255)
-    p_publisher    VARCHAR(255)
-    p_genre        VARCHAR(100)
-    p_image_url    VARCHAR(1024)
-Desc: 
-    Inserts a new book record into the `book` table.
-    And return the inserted book id
-*/
-DROP PROCEDURE IF EXISTS add_book;
-DELIMITER $$
-CREATE PROCEDURE add_book
-(
-    IN p_title VARCHAR(255), 
-    IN p_publisher VARCHAR(255),
-    IN p_genre VARCHAR(100),
-    IN p_image_url VARCHAR(1024)
-)
-BEGIN
-  INSERT INTO book (title, publisher, genre, image_url)
-  VALUES (p_title, p_publisher, p_genre, p_image_url);
-
-  -- Return the inserted book_id
-  SELECT LAST_INSERT_ID() AS inserted_id;
-END $$
-DELIMITER ;
-
-/*
-Procedure: add_book_author
-Params: 
-    p_book_id      INT
-    p_author_id    INT
-Desc:
-    Creates a record in the `bookAuthor` junction table.
-*/
-DROP PROCEDURE IF EXISTS add_book_author;
-DELIMITER $$
-CREATE PROCEDURE add_book_author
-(
-  IN p_book_id INT,
-  IN p_author_id INT
-)
-BEGIN
-  INSERT INTO bookAuthor (book_id, author_id)
-  VALUES (p_book_id, p_author_id);
-END $$
-DELIMITER ;
-
-/*
-Procedure: retire_book
-Params: 
-    p_book_id INT
-Desc: 
-    Retire a book by setting 'is_retired' to TRUE
-*/
-DROP PROCEDURE IF EXISTS retire_book;
-DELIMITER $$
-CREATE PROCEDURE retire_book
-(
-  IN p_book_id INT
-)
-BEGIN
-    UPDATE book
-    SET is_retired = TRUE 
-    WHERE book_id = p_book_id;
-END $$
-DELIMITER ;
-
--- STAFF REPORTS
-
-/*
-Procedure: get_low_availability_books
-Params: 
-    p_availability_count INT
-    p_book_count INT
-Desc:
-    Return the top "n" lowest availability books
-*/
-DROP PROCEDURE IF EXISTS get_low_availability_books;
-DELIMITER $$
-CREATE PROCEDURE get_low_availability_books(
-    IN p_availability_count INT, 
-    IN p_book_count INT
-)
-BEGIN
-    SELECT * 
-    FROM book 
-    WHERE available_copies <= p_availability_count
-    AND is_retired = FALSE
-    ORDER BY available_copies ASC
-    LIMIT p_book_count;
-END $$
-DELIMITER ;
-
-/*
-Procedure: get_most_borrowed_books
-Params: 
-    p_book_count INT
-    p_start_date TIMESTAMP
-    p_end_date TIMESTAMP
-Desc:
-    Return the top "n" borrowed books, defined by number of checkouts.
-*/
-DROP PROCEDURE IF EXISTS get_most_borrowed_books;
-DELIMITER $$
-CREATE PROCEDURE get_most_borrowed_books(
-    IN p_book_count INT,
-    IN p_start_date TIMESTAMP,
-    IN p_end_date TIMESTAMP
-)
-BEGIN
-    SELECT *
-    FROM book b
-	JOIN (
-        -- Sub query to find 'n' book ids that has most checkouts
-        SELECT 
-        c.book_id, 
-        COUNT(*) as checkout_count 
-        FROM checkout c
-        WHERE c.borrow_date BETWEEN p_start_date AND p_end_date -- Filter by time range
-        GROUP BY c.book_id
-        ORDER BY checkout_count DESC
-        LIMIT p_book_count
-    ) s ON b.book_id = s.book_id;
-END $$
+END$$ 
 DELIMITER ;
 
 -- MOCK DATA
