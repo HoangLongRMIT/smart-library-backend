@@ -12,7 +12,8 @@ BEGIN
     INTO v_late
     FROM checkout
     WHERE checkout_id = p_checkout_id;
-
-    RETURN NOT v_late; -- return true if is_late is false and false if is_late is true
+    
+    -- return true if is_late is false and false if is_late is true
+    RETURN NOT v_late; 
 END $$
 DELIMITER ;

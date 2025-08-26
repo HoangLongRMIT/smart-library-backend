@@ -12,7 +12,8 @@ BEGIN
     INTO v_count
     FROM checkout
     WHERE borrow_date BETWEEN p_start AND p_end;
-
-    RETURN v_count; -- return number of browwed books on a give time range
+    
+    -- return number of browwed books on a give time range
+    RETURN v_count; 
 END $$
 DELIMITER ;

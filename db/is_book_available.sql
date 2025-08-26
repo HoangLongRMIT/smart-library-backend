@@ -12,7 +12,8 @@ BEGIN
     INTO v_copies
     FROM book
     WHERE book_id = p_book_id;
-
-    RETURN v_copies > 0; -- return true if the copies is greater than 0 or else return false
+    
+    -- return true if the copies is greater than 0 or else return false
+    RETURN v_copies > 0; 
 END $$
 DELIMITER ;
