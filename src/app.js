@@ -4,18 +4,24 @@ import cors from "cors";
 import pool from "./db/mysql.js";
 import { connectMongo } from "./db/mongo.js";
 import booksRouter from "./routes/books.js";
+import userRouter from "./routes/users.js";
+import adminRouter from "./routes/admin.js";
+import reportRouter from "./routes/reports.js";
 
 const app = express();
-// app.use(cors());
+app.use(cors());
 app.use(express.json());
 app.use(cors({ origin: "http://localhost:3001" }));
 
-app.get("/api/health", async (req,res) => {
-  const [rows] = await pool.query("SELECT 1 AS ok");
-  res.json({ ok: rows[0].ok === 1 });
+app.get("/api/health", (_req, res) => {
+  res.json({ ok: true });
 });
 
 app.use("/api/books", booksRouter);
+app.use("/api/users", userRouter);
+app.use("/api/admin", adminRouter);
+app.use("/api/reports", reportRouter);
+
 
 const port = process.env.PORT || 8080;
 connectMongo()
