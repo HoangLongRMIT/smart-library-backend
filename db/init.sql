@@ -1,9 +1,7 @@
--- Reset database every run
 DROP DATABASE IF EXISTS library;
 CREATE DATABASE library;
 USE library;
 
--- Single users table with role
 CREATE TABLE user (
   user_id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
@@ -12,7 +10,6 @@ CREATE TABLE user (
   password VARCHAR(255) NOT NULL
 );
 
--- Books for the frontend list (includes image_url for cover)
 CREATE TABLE book (
   book_id INT AUTO_INCREMENT PRIMARY KEY,
   title VARCHAR(255) NOT NULL,
@@ -23,13 +20,11 @@ CREATE TABLE book (
   image_url VARCHAR(1024)
 );
 
--- Author table
 CREATE TABLE author (
     author_id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(255) NOT NULL
 );
 
--- Book author (junction table for many-to-many relationship)
 CREATE TABLE bookAuthor (
     book_id INT,
     author_id INT,
@@ -38,7 +33,6 @@ CREATE TABLE bookAuthor (
     FOREIGN KEY (author_id) REFERENCES author(author_id)
 );
 
--- Review table
 CREATE TABLE review (
     review_id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
@@ -49,7 +43,6 @@ CREATE TABLE review (
     FOREIGN KEY (book_id) REFERENCES book(book_id)
 );
 
--- Staff logs table
 CREATE TABLE staffLog (
     log_id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
@@ -60,7 +53,6 @@ CREATE TABLE staffLog (
     FOREIGN KEY (book_id) REFERENCES book(book_id)
 );
 
--- Checkout
 CREATE TABLE checkout (
   checkout_id INT AUTO_INCREMENT PRIMARY KEY,
   user_id INT NOT NULL,
@@ -68,140 +60,16 @@ CREATE TABLE checkout (
   borrow_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   return_date TIMESTAMP NULL,
   is_late BOOLEAN DEFAULT NULL, -- null for active borrows
+  due_date TIMESTAMP NULL,
   CONSTRAINT fk_checkout_user FOREIGN KEY (user_id) REFERENCES user(user_id),
   CONSTRAINT fk_checkout_book FOREIGN KEY (book_id) REFERENCES book(book_id)
 );
 
-
--- Borrow / Return books
-
-/*
-Procedure: borrow_book
-Params: user_id INT, book_id INT
-Desc: Handles borrowing a book with transaction + row locking
-*/
-
-DROP PROCEDURE IF EXISTS borrow_book;
-DELIMITER $$ 
-CREATE PROCEDURE borrow_book(IN user_id INT, IN book_id INT)
-BEGIN
-    DECLARE copies_left INT;
-
-    -- rollback on any sql exceptions
-    DECLARE EXIT HANDLER FOR SQLEXCEPTION
-    BEGIN
-        ROLLBACK;
-        RESIGNAL;
-    END;
-
-    START TRANSACTION;
-
-    -- verify that book is still available, lock row
-    SELECT available_copies 
-    INTO copies_left
-    FROM book b 
-    WHERE b.book_id = book_id
-    FOR UPDATE;
-
-    -- throws if no copies left
-    IF copies_left <= 0 THEN
-        SIGNAL SQLSTATE '45000'
-            SET MESSAGE_TEXT = 'No available copies left';
-    END IF;
-
-    -- insert borrow checkout
-    INSERT INTO checkout(user_id, book_id, borrow_date) 
-    VALUES (user_id, book_id, CURRENT_TIMESTAMP);
-
-    COMMIT;
-END $$ 
-DELIMITER ;
-
-/*
-Procedure: return_book
-Params: checkout_id INT
-Desc: Handles returning a book
-*/
-
-DROP PROCEDURE IF EXISTS return_book;
-DELIMITER $$
-CREATE PROCEDURE return_book(IN p_checkout_id INT)
-BEGIN
-    DECLARE v_borrow_date TIMESTAMP;
-    DECLARE v_return_date TIMESTAMP;
-    DECLARE v_is_late BOOLEAN;
-
-    -- rollback on any sql exceptions
-    DECLARE EXIT HANDLER FOR SQLEXCEPTION
-    BEGIN
-        ROLLBACK;
-        RESIGNAL;
-    END;
-
-    START TRANSACTION;
-
-    -- fetch borrow date and return date
-    SELECT c.borrow_date, c.return_date
-    INTO v_borrow_date, v_return_date
-    FROM checkout c
-    WHERE c.checkout_id = p_checkout_id;
-
-    -- throws if already returned
-    IF v_return_date IS NOT NULL THEN
-        SIGNAL SQLSTATE '45000'
-            SET MESSAGE_TEXT = 'Already returned checkout';
-    END IF;
-
-    -- calculate if returned late (>7 days)
-    SET v_is_late = TIMESTAMPDIFF(DAY, v_borrow_date, CURRENT_TIMESTAMP) > 7;
-
-    -- update checkout
-    UPDATE checkout c
-    SET c.return_date = CURRENT_TIMESTAMP,
-        c.is_late = v_is_late
-    WHERE c.checkout_id = p_checkout_id;
-
-    COMMIT;
-END $$ 
-DELIMITER ;
-
-/*
-Trigger: after_checkout_insert
-Desc: Update book metadata after a borrow
-*/
-
-DROP TRIGGER IF EXISTS after_checkout_insert;
-DELIMITER $$
-CREATE TRIGGER after_checkout_insert
-AFTER INSERT ON checkout
-FOR EACH ROW
-BEGIN
-    IF NEW.borrow_date IS NOT NULL AND NEW.return_date IS NULL THEN
-        UPDATE book 
-        SET available_copies = available_copies - 1
-        WHERE book.book_id = NEW.book_id;
-    END IF;
-END $$ 
-DELIMITER ;
-
-/*
-Trigger: after_checkout_update
-Desc: Update book metadata after a return
-*/
-
-DROP TRIGGER IF EXISTS after_checkout_update;
-DELIMITER $$
-CREATE TRIGGER after_checkout_update
-AFTER UPDATE ON checkout
-FOR EACH ROW
-BEGIN
-    IF NEW.return_date IS NOT NULL AND OLD.return_date IS NULL THEN
-        UPDATE book 
-        SET available_copies = available_copies + 1
-        WHERE book.book_id = NEW.book_id;
-    END IF;
-END $$ 
-DELIMITER ;
+CREATE TABLE IF NOT EXISTS book_retirement (
+  book_id INT PRIMARY KEY,
+  retired_reason VARCHAR(255) NOT NULL,
+  CONSTRAINT fk_retire_book FOREIGN KEY (book_id) REFERENCES book(book_id)
+);
 
 -- Mock data
 
@@ -867,6 +735,7 @@ INSERT INTO staffLog (user_id, book_id, action, timestamp) VALUES
   (13, 83, 'Approved checkout', '2025-07-01 12:35:00'),
   (2, 16, 'Updated author info', '2025-07-08 04:35:00'),
   (10, 28, 'Deleted book copy', '2025-07-09 18:17:00'),
+  (8, 45, 'Updated book info', '2025-06-23 05:24:00');
   (8, 45, 'Updated book info', '2025-06-23 05:24:00');
 
 -- Optimizations to improve query performance: Indexes
