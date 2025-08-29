@@ -8,9 +8,9 @@ const norm = (v) => (typeof v === "string" ? v.trim() : "");
 
 r.get("/", async (req, res) => {
   try {
-    const title     = norm(req.query.title);
-    const author    = norm(req.query.author);
-    const genre     = norm(req.query.genre);
+    const title = norm(req.query.title);
+    const author = norm(req.query.author);
+    const genre = norm(req.query.genre);
     const publisher = norm(req.query.publisher);
 
     const [sets] = await pool.query(
@@ -42,10 +42,16 @@ r.post("/:bookId/borrow", async (req, res) => {
     return res.status(201).json({ ok: true, book_id: bookId, user_id: userId });
   } catch (err) {
     console.error("borrow failed:", err);
-    const msg =
-      err?.sqlMessage?.toLowerCase().includes("no available copies")
-        ? "No available copies left"
-        : "Borrow failed";
+    const sqlMsg = err?.sqlMessage?.toLowerCase() || "";
+    let msg;
+
+    if (sqlMsg.includes("no available copies")) {
+      msg = "No available copies left";
+    } else if (sqlMsg.includes("retired")) {
+      msg = "This book has been retired and cannot be borrowed";
+    } else {
+      msg = "Borrow failed";
+    }
     res.status(400).json({ error: msg });
   } finally {
     if (conn) conn.release();
@@ -59,10 +65,9 @@ r.get("/:userId/borrowed", async (req, res) => {
   }
 
   try {
-    const [rows] = await pool.query(
-      "CALL list_user_current_borrows(?)",
-      [userId]
-    );
+    const [rows] = await pool.query("CALL list_user_current_borrows(?)", [
+      userId,
+    ]);
     res.json(firstResult(rows) || []);
   } catch (err) {
     console.error("load borrowed failed:", err);
