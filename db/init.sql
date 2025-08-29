@@ -736,3 +736,43 @@ INSERT INTO staffLog (user_id, book_id, action, timestamp) VALUES
   (2, 16, 'Updated author info', '2025-07-08 04:35:00'),
   (10, 28, 'Deleted book copy', '2025-07-09 18:17:00'),
   (8, 45, 'Updated book info', '2025-06-23 05:24:00');
+  (8, 45, 'Updated book info', '2025-06-23 05:24:00');
+
+-- Optimizations to improve query performance: Indexes
+
+-- Optimization for book searches
+CREATE INDEX idx_book_title ON book(title);
+CREATE INDEX idx_book_genre ON book(genre);
+CREATE INDEX idx_publisher_id ON book(publisher);
+
+-- Optimization for reports
+
+-- Most borrowed books within a time frame
+CREATE INDEX idx_checkout_book_borrow_date ON checkout(book_id, borrow_date);
+
+-- Most active users
+CREATE INDEX idx_checkout_user_borrow_date ON checkout(user_id, borrow_date);
+
+-- Books with low availability
+CREATE INDEX idx_checkout_book_return_date ON checkout(book_id, return_date);
+
+-- Optimization to improve query performance: Partitions
+
+-- Partitioning checkout table by month of borrow_date
+-- Currently not possible due to conflict with foreign key constraint
+
+-- ALTER TABLE checkout
+-- PARTITION BY RANGE (TO_DAYS(borrow_date)) (
+-- 	PARTITION p2025_01 VALUES LESS THAN (TO_DAYS('2025-02-01')),
+--   PARTITION p2025_02 VALUES LESS THAN (TO_DAYS('2025-03-01')),
+--   PARTITION p2025_03 VALUES LESS THAN (TO_DAYS('2025-04-01')),
+--   PARTITION p2025_04 VALUES LESS THAN (TO_DAYS('2025-05-01')),
+--   PARTITION p2025_05 VALUES LESS THAN (TO_DAYS('2025-06-01')),
+--   PARTITION p2025_06 VALUES LESS THAN (TO_DAYS('2025-07-01')),
+--   PARTITION p2025_07 VALUES LESS THAN (TO_DAYS('2025-08-01')),
+--   PARTITION p2025_08 VALUES LESS THAN (TO_DAYS('2025-09-01')),
+--   PARTITION p2025_09 VALUES LESS THAN (TO_DAYS('2025-10-01')),
+--   PARTITION p2025_10 VALUES LESS THAN (TO_DAYS('2025-11-01')),
+--   PARTITION p2025_11 VALUES LESS THAN (TO_DAYS('2025-12-01')),
+--   PARTITION p2025_12 VALUES LESS THAN (TO_DAYS('2026-01-01'))
+-- );
