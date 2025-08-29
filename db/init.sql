@@ -758,11 +758,21 @@ CREATE INDEX idx_checkout_book_return_date ON checkout(book_id, return_date);
 
 -- Optimization to improve query performance: Partitions
 
--- Partitioning checkout table by year of borrow_date
-ALTER TABLE checkout
-PARTITION BY RANGE (YEAR(borrow_date)) (
-  PARTITION p2023 VALUES LESS THAN (2024),
-  PARTITION p2024 VALUES LESS THAN (2025),
-  PARTITION p2025 VALUES LESS THAN (2026),
-  PARTITION pmax  VALUES LESS THAN MAXVALUE
-);
+-- Partitioning checkout table by month of borrow_date
+-- Currently not possible due to conflict with foreign key constraint
+
+-- ALTER TABLE checkout
+-- PARTITION BY RANGE (TO_DAYS(borrow_date)) (
+-- 	PARTITION p2025_01 VALUES LESS THAN (TO_DAYS('2025-02-01')),
+--   PARTITION p2025_02 VALUES LESS THAN (TO_DAYS('2025-03-01')),
+--   PARTITION p2025_03 VALUES LESS THAN (TO_DAYS('2025-04-01')),
+--   PARTITION p2025_04 VALUES LESS THAN (TO_DAYS('2025-05-01')),
+--   PARTITION p2025_05 VALUES LESS THAN (TO_DAYS('2025-06-01')),
+--   PARTITION p2025_06 VALUES LESS THAN (TO_DAYS('2025-07-01')),
+--   PARTITION p2025_07 VALUES LESS THAN (TO_DAYS('2025-08-01')),
+--   PARTITION p2025_08 VALUES LESS THAN (TO_DAYS('2025-09-01')),
+--   PARTITION p2025_09 VALUES LESS THAN (TO_DAYS('2025-10-01')),
+--   PARTITION p2025_10 VALUES LESS THAN (TO_DAYS('2025-11-01')),
+--   PARTITION p2025_11 VALUES LESS THAN (TO_DAYS('2025-12-01')),
+--   PARTITION p2025_12 VALUES LESS THAN (TO_DAYS('2026-01-01'))
+-- );
