@@ -736,3 +736,24 @@ INSERT INTO staffLog (user_id, book_id, action, timestamp) VALUES
   (2, 16, 'Updated author info', '2025-07-08 04:35:00'),
   (10, 28, 'Deleted book copy', '2025-07-09 18:17:00'),
   (8, 45, 'Updated book info', '2025-06-23 05:24:00');
+  (8, 45, 'Updated book info', '2025-06-23 05:24:00');
+
+-- Optimizations to improve query performance: Indexes
+
+-- Optimization for book searches
+CREATE INDEX idx_book_title ON book(title);
+CREATE INDEX idx_book_genre ON book(genre);
+CREATE INDEX idx_publisher_id ON book(publisher);
+CREATE INDEX idx_author_name ON author(name);
+CREATE INDEX idx_book_author ON book(author_id);
+
+-- Optimization for reports
+
+-- Most borrowed books within a time frame
+CREATE INDEX idx_checkout_book_borrow_date ON checkout(book_id, borrow_date);
+
+-- Most active users
+CREATE INDEX idx_checkout_user_borrow_date ON checkout(user_id, borrow_date);
+
+-- Books with low availability
+CREATE INDEX idx_checkout_book_return_date ON checkout(book_id, return_date);
