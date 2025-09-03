@@ -16,7 +16,6 @@ services:
       timeout: 3s
       retries: 20
 
-  # One-shot job: runs scripts/load-sql.sh against the mysql service
   db-load:
     image: mysql:8.0
     depends_on:
@@ -33,14 +32,27 @@ services:
       - ./db:/db:ro
       - ./scripts/load-sql.sh:/load-sql.sh:ro
     command: ["/bin/sh","-lc","/load-sql.sh"]
-    # If your compose supports it, keep this:
     restart: "no"
 
   mongo:
     image: mongo:7
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: root
+      MONGO_INITDB_DATABASE: library
     ports: ["27017:27017"]
     volumes:
       - mongo_data:/data/db
+      # EITHER use your absolute path (quotes needed due to spaces)...
+      - "/Users/phamlong/Desktop/RMIT/Database Application/smart-lib/smart-library-backend/db/reading_sessions.json:/docker-entrypoint-initdb.d/reading_sessions.json:ro"
+      # ...OR (better) keep it in-repo:
+      # - ./db/reading_sessions.json:/docker-entrypoint-initdb.d/reading_sessions.json:ro
+      - ./scripts/init-mongo.sh:/docker-entrypoint-initdb.d/10-init-mongo.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --username root --password root --authenticationDatabase admin --eval 'db.adminCommand({ ping: 1 })' --quiet"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
 
   api:
     build: .
@@ -48,10 +60,13 @@ services:
       mysql:
         condition: service_healthy
       db-load:
-        # If your docker compose supports this, use completed_successfully.
-        # Otherwise keep service_started and the proc will already exist by the time API starts in practice.
         condition: service_started
+      mongo:
+        condition: service_healthy
     env_file: [.env]
+    environment:
+      MONGO_URI: mongodb://root:root@mongo:27017
+      MONGO_DB: library
     ports: ["8080:8080"]
     volumes:
       - .:/usr/src/app
