@@ -7,6 +7,7 @@ import booksRouter from "./routes/books.js";
 import userRouter from "./routes/users.js";
 import adminRouter from "./routes/admin.js";
 import reportRouter from "./routes/reports.js";
+import analyticsRouter from "./routes/analytics.js";
 
 const app = express();
 app.use(cors());
@@ -21,7 +22,7 @@ app.use("/api/books", booksRouter);
 app.use("/api/users", userRouter);
 app.use("/api/admin", adminRouter);
 app.use("/api/reports", reportRouter);
-
+app.use("/api/analytics", analyticsRouter);
 
 const port = process.env.PORT || 8080;
 connectMongo()

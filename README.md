@@ -4,6 +4,13 @@ A Node.js backend for the Smart Library project, using MySQL and MongoDB for dat
 Runs inside Docker for easy setup and deployment.
 Configured to serve the API locally on http://localhost:8080.
 
+## Contribution Score
+- **Phạm Trịnh Hoàng Long - s3914119:** 5
+- **Nguyễn Duy Khang - s4076978:** 5
+- **Nguyễn Thế Vinh - s3929237:** 5
+- **Nguyễn Tuấn Anh - s3911444:** 5
+- **Lê Nguyễn Minh Quân - s3978949:** 5
+
 ---
 
 ## Tech Stack
