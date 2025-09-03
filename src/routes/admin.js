@@ -26,6 +26,8 @@ async function upsertAuthorByName(conn, name) {
 }
 
 r.post("/books", async (req, res) => {
+  const adminId = req.user?.user_id ?? Number(req.body?.admin_user_id) ?? null;
+
   const title = t(req.body.title);
   const authorsCsv = t(req.body.authors);
   const publisher = t(req.body.publisher);
@@ -67,6 +69,18 @@ r.post("/books", async (req, res) => {
       return res.status(500).json({ error: "Failed to retrieve new book id" });
     }
 
+    if (adminId) {
+      try {
+        await conn.query("CALL log_staff_action_tx(?, ?, ?)", [
+          adminId,
+          book_id,
+          "Added new book",
+        ]);
+      } catch (e) {
+        console.warn("staff log failed (add book):", e?.message || e);
+      }
+    }
+
     res.status(201).json({ success: true, book_id });
   } catch (err) {
     console.error("add book failed:", err);
@@ -78,6 +92,7 @@ r.post("/books", async (req, res) => {
 
 
 r.post("/books/:bookId/inventory/update", async (req, res) => {
+  const adminId = req.user?.user_id ?? Number(req.body?.admin_user_id) ?? null;
   const bookId = Number(req.params.bookId);
   const newCount = Number.isFinite(Number(req.body?.count))
     ? Math.max(0, Number(req.body.count))
@@ -89,6 +104,17 @@ r.post("/books/:bookId/inventory/update", async (req, res) => {
 
   try {
     await pool.query("CALL update_book_inventory(?, ?)", [bookId, newCount]);
+    if (adminId) {
+      try {
+        await pool.query("CALL log_staff_action_tx(?, ?, ?)", [
+          adminId,
+          bookId,
+          `Inventory set to ${newCount}`,
+        ]);
+      } catch (e) {
+        console.warn("staff log failed (inventory):", e?.message || e);
+      }
+    }
     return res.json({ ok: true, book_id: bookId, available_copies: newCount });
   } catch (err) {
     console.error("inventory update failed:", err);
@@ -98,6 +124,7 @@ r.post("/books/:bookId/inventory/update", async (req, res) => {
 
 
 r.post("/books/:bookId/retire", async (req, res) => {
+  const adminId = req.user?.user_id ?? Number(req.body?.admin_user_id) ?? null;
   const bookId = Number(req.params.bookId);
   const reason = String(req.body?.reason || "").trim();
 
@@ -107,6 +134,17 @@ r.post("/books/:bookId/retire", async (req, res) => {
 
   try {
     await pool.query("CALL retire_book(?, ?)", [bookId, reason]);
+    if (adminId) {
+      try {
+        await pool.query("CALL log_staff_action_tx(?, ?, ?)", [
+          adminId,
+          bookId,
+          `Retired: ${reason}`,
+        ]);
+      } catch (e) {
+        console.warn("staff log failed (retire):", e?.message || e);
+      }
+    }
     return res.json({ ok: true, book_id: bookId, retired: true, reason });
   } catch (err) {
     console.error("retire failed:", err);
@@ -115,11 +153,23 @@ r.post("/books/:bookId/retire", async (req, res) => {
 });
 
 r.post("/books/:bookId/unretire", async (req, res) => {
+  const adminId = req.user?.user_id ?? Number(req.body?.admin_user_id) ?? null;
   const bookId = Number(req.params.bookId);
   if (!bookId) return res.status(400).json({ error: "bookId required" });
 
   try {
     await pool.query("CALL unretire_book(?)", [bookId]);
+    if (adminId) {
+      try {
+        await pool.query("CALL log_staff_action_tx(?, ?, ?)", [
+          adminId,
+          bookId,
+          "Unretired",
+        ]);
+      } catch (e) {
+        console.warn("staff log failed (unretire):", e?.message || e);
+      }
+    }
     return res.json({ ok: true, book_id: bookId, retired: false });
   } catch (err) {
     console.error("unretire failed:", err);
