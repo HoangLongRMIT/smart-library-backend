@@ -41,3 +41,12 @@ Backend will available:
 ```
 http://localhost:8080
 ```
+
+---
+
+## Contribution Score
+- **Phạm Trịnh Hoàng Long - s3914119:** 5
+- **Nguyễn Duy Khang - s4076978:** 5
+- **Nguyễn Thế Vinh - s3929237:** 5
+- **Nguyễn Tuấn Anh - s3911444:** 5
+- **Lê Nguyễn Minh Quân - s3978949:** 5
