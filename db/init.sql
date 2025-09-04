@@ -72,6 +72,20 @@ CREATE TABLE IF NOT EXISTS book_retirement (
   CONSTRAINT fk_retire_book FOREIGN KEY (book_id) REFERENCES book(book_id)
 );
 
+-- Set default value for due_date if not present 
+-- to make sure mock data is correct
+DROP TRIGGER IF EXISTS before_checkout_insert;
+DELIMITER $$
+CREATE TRIGGER before_checkout_insert
+BEFORE INSERT ON checkout
+FOR EACH ROW
+BEGIN
+    IF NEW.due_date IS NULL AND NEW.borrow_date IS NOT NULL THEN 
+        SET NEW.due_date = DATE_ADD(NEW.borrow_date, INTERVAL 1 MONTH);
+    END IF;
+END $$ 
+DELIMITER ;
+
 -- Mock data
 
 -- user table
