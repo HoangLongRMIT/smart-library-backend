@@ -37,9 +37,10 @@ CREATE TABLE review (
     review_id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
     book_id INT NOT NULL,
-    rating INT CHECK (Rating >= 1 AND Rating <= 5),
+    rating INT NOT NULL,
     comment TEXT,
-    FOREIGN KEY (user_id) REFERENCES user(user_id),
+    CONSTRAINT chk_review_rating CHECK (rating BETWEEN 1 AND 5),
+    FOREIGN KEY (user_id) REFERENCES `user`(user_id),
     FOREIGN KEY (book_id) REFERENCES book(book_id)
 );
 
@@ -737,10 +738,23 @@ INSERT INTO staffLog (user_id, book_id, action, timestamp) VALUES
   (10, 28, 'Deleted book copy', '2025-07-09 18:17:00'),
   (8, 45, 'Updated book info', '2025-06-23 05:24:00');
 
+CREATE INDEX idx_book_title     ON book(title);
+CREATE INDEX idx_book_genre     ON book(genre);
+CREATE INDEX idx_book_publisher ON book(publisher);
+
+CREATE INDEX idx_bookAuthor_book   ON bookAuthor(book_id, author_id);
+CREATE INDEX idx_bookAuthor_author ON bookAuthor(author_id, book_id);
+
+CREATE INDEX idx_review_book ON review(book_id);
+
+CREATE INDEX idx_checkout_book_borrow_date  ON checkout(book_id, borrow_date);
+CREATE INDEX idx_checkout_user_borrow_date  ON checkout(user_id, borrow_date);
+CREATE INDEX idx_checkout_book_return_date  ON checkout(book_id, return_date);
+
 UPDATE book b
 LEFT JOIN (
-	SELECT book_id, AVG(rating) as avg_rating
-    FROM review
-    GROUP BY book_id
+  SELECT book_id, ROUND(AVG(rating), 1) AS avg_rating
+  FROM review
+  GROUP BY book_id
 ) r ON b.book_id = r.book_id
-SET b.average_rating = IFNULL(r.avg_rating, 0.0);
+SET b.average_rating = COALESCE(r.avg_rating, 0.0);
