@@ -12,7 +12,14 @@ import analyticsRouter from "./routes/analytics.js";
 const app = express();
 app.use(cors());
 app.use(express.json());
-app.use(cors({ origin: "http://localhost:3001" }));
+app.use(
+  cors({
+    origin: ["http://localhost:3001"], // adjust for your UI origin(s)
+    credentials: true,
+    allowedHeaders: ["Content-Type", "x-admin-user-id"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  })
+);
 
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true });
